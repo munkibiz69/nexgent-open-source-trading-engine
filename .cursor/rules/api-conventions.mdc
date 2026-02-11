@@ -1,0 +1,64 @@
+---
+description: REST API design, routing, authentication, and validation conventions
+globs: packages/backend/src/api/**/*.ts
+alwaysApply: false
+---
+
+# API Conventions
+
+## Route Structure
+
+Routes are versioned under `/api/v1/` with modular resource folders:
+
+```
+api/v1/{resource}/
+├── routes.ts      # Route definitions with middleware chain
+├── handlers/      # One file per operation (create.ts, list.ts, get.ts, update.ts, delete.ts)
+├── types.ts       # Request/response TypeScript types
+└── index.ts       # Re-exports routes
+```
+
+## Route Definition Pattern
+
+```typescript
+const router = Router();
+router.post('/', authenticateWithScope('signals'), signalsApiKeyRateLimiter, createTradingSignal);
+router.get('/', authenticateWithScope('signals'), listTradingSignals);
+router.get('/:id', authenticateWithScope('signals'), getTradingSignal);
+```
+
+Middleware order: **auth** -> **rate limiting** -> **validation** -> **handler**
+
+## Authentication Middleware
+
+- `authenticate` — JWT-only auth for web UI routes
+- `authenticateWithScope(scope)` — API key with scope OR JWT (JWT gets full access)
+- Both attach `req.user` (with `userId`) and optionally `req.apiKeyId`
+
+## Validation
+
+Use Zod schemas from `@nexgent/shared` with the `validate` middleware:
+
+```typescript
+router.post('/login', validate(LoginSchema), login);
+```
+
+Schemas validate `{ body, query, params }` and throw `ValidationError` with field-level details.
+
+## Response Conventions
+
+- `200` — Success (GET, PUT, PATCH)
+- `201` — Created (POST)
+- `204` — No content (DELETE)
+- Error format: `{ error: string, code?: string, details?: any }`
+- Always include `x-request-id` for traceability
+
+## User-Scoped Resources
+
+When a resource belongs to a user, always filter by `userId` from `req.user`:
+
+```typescript
+const signals = await service.list({ userId: req.user.userId });
+```
+
+Never trust client-provided user IDs for authorization.

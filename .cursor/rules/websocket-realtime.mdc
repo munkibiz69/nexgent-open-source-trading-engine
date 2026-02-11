@@ -1,0 +1,38 @@
+---
+description: WebSocket server and real-time update patterns
+globs: "packages/backend/src/infrastructure/websocket/**/*.ts,packages/frontend/src/infrastructure/websocket/**/*.ts"
+alwaysApply: false
+---
+
+# WebSocket & Real-Time Patterns
+
+## Backend WebSocket Server
+
+- Path: `/ws` (HTTP upgrade on the Express server)
+- JWT authentication via query parameter on connection
+- One connection per agent (keyed by agentId)
+- Ping/pong keepalive every 30 seconds
+
+## Message Types
+
+Broadcasts include:
+- **Position updates** — open/close/modify positions
+- **Price updates** — real-time token price feeds
+- **Balance updates** — portfolio changes
+
+## Frontend WebSocket Hook
+
+```typescript
+const { data, isConnected } = useWebSocket(agentId);
+```
+
+- Auto-reconnection with **exponential backoff**
+- Price update **batching** (100ms debounce) to avoid excessive re-renders
+- Clean disconnect on component unmount
+
+## Best Practices
+
+- Always authenticate WebSocket connections (reject unauthenticated)
+- Use typed message envelopes: `{ type: string, payload: T }`
+- Handle reconnection gracefully — resync state on reconnect
+- Debounce high-frequency updates (prices) on the frontend

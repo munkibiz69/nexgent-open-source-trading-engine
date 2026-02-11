@@ -1,0 +1,72 @@
+---
+description: Frontend React/Next.js component patterns and conventions
+globs: packages/frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Patterns
+
+## Component Conventions
+
+- **Functional components only** with TypeScript props
+- **File naming**: kebab-case (`agent-profile.tsx`), PascalCase for components (`AgentProfile`)
+- Mark client components with `'use client'` directive
+- Colocate related files in feature folders (`components/`, `hooks/`, `types/`)
+
+## Data Fetching with React Query
+
+Use TanStack Query for all server state. Follow the service + hook pattern:
+
+```typescript
+// infrastructure/api/services/agents.service.ts
+class AgentsService {
+  async getAgents(userId?: string): Promise<Agent[]> { ... }
+}
+
+// features/agents/hooks/use-agents.ts
+export function useAgents(userId?: string) {
+  return useQuery({
+    queryKey: ['agents', userId],
+    queryFn: () => agentsService.getAgents(userId),
+    enabled: !!userId,
+  });
+}
+```
+
+Defaults: `staleTime: 5min`, `gcTime: 10min`, `refetchOnWindowFocus: false`.
+
+## State Management
+
+- **Server state**: React Query (queries + mutations with optimistic updates)
+- **Client state**: React Context (`AgentSelectionContext`, `CurrencyContext`, etc.)
+- **No Redux/Zustand** — keep it simple with context + hooks
+
+## Styling
+
+- **Tailwind CSS** with dark mode by default
+- **shadcn/ui** (Radix primitives) for UI components in `shared/components/ui/`
+- Use `cn()` utility (clsx + tailwind-merge) for conditional classes
+- CSS variables for theming in `globals.css`
+
+## Forms
+
+Use React Hook Form + Zod + shadcn/ui Form components:
+
+```tsx
+const form = useForm<Values>({
+  resolver: zodResolver(schema),
+  defaultValues: { ... },
+});
+
+<Form {...form}>
+  <FormField control={form.control} name="email" render={...} />
+</Form>
+```
+
+Validation schemas come from `@nexgent/shared`.
+
+## Routing
+
+- Next.js App Router with **route groups**: `(auth)/`, `(dashboard)/`
+- Protected routes via NextAuth middleware
+- Layouts: root -> auth/dashboard -> page-specific

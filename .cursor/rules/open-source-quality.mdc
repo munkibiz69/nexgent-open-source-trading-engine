@@ -1,0 +1,62 @@
+---
+description: Open-source code quality standards, documentation, and best practices
+alwaysApply: true
+---
+
+# Open-Source Code Quality
+
+Nexgent AI is an **open-source project**. All code must meet a high bar for readability, documentation, and maintainability since external contributors and users will read, fork, and extend it.
+
+## Code Comments
+
+- Add **JSDoc comments** on all exported functions, classes, and interfaces
+- Explain **why**, not just what — the code shows what, comments explain intent
+- Document non-obvious business logic, especially trading domain concepts
+- Add inline comments for complex algorithms, edge cases, and workarounds
+
+```typescript
+// BAD — restates the code
+/** Gets the agent */
+async getAgent(id: string) { ... }
+
+// GOOD — explains purpose and behavior
+/** Retrieves an agent by ID, returning null if not found or soft-deleted. */
+async getAgent(id: string): Promise<Agent | null> { ... }
+```
+
+## Readability
+
+- Prefer descriptive variable/function names over abbreviations
+- Keep functions short and single-purpose (under ~50 lines)
+- Extract complex conditions into well-named helper functions or variables
+- Avoid deep nesting — use early returns and guard clauses
+
+```typescript
+// BAD
+if (agent) {
+  if (agent.isActive) {
+    if (agent.hasWallet) {
+      // deeply nested logic
+    }
+  }
+}
+
+// GOOD
+if (!agent || !agent.isActive || !agent.hasWallet) return;
+// clean, flat logic
+```
+
+## Best Practices
+
+- No hardcoded secrets, keys, or credentials — use environment variables
+- No `console.log` in production code — use the Pino logger
+- No `// @ts-ignore` or `as any` without a comment explaining why
+- Handle all error paths — never leave empty catch blocks
+- Remove dead code, commented-out code, and TODO hacks before merging
+- Keep dependencies minimal — justify new packages
+
+## Commit & PR Quality
+
+- Write clear, descriptive commit messages explaining the "why"
+- Keep changes focused — one concern per PR
+- Ensure all tests pass before suggesting a change is complete

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "agent_transactions" ALTER COLUMN "input_amount" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "input_price" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "output_amount" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "output_price" SET DATA TYPE DECIMAL(30,18);

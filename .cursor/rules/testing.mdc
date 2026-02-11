@@ -1,0 +1,47 @@
+---
+description: Testing conventions and patterns
+globs: "packages/backend/tests/**/*.ts,**/*.test.ts,**/*.spec.ts"
+alwaysApply: false
+---
+
+# Testing Conventions
+
+## Framework
+
+- **Jest** with **ts-jest** (ESM preset)
+- Test timeout: 30 seconds
+- Path aliases mirrored from `tsconfig.json`
+
+## Test Structure
+
+```
+packages/backend/tests/
+├── unit/          # Fast, isolated tests (mock dependencies)
+└── integration/   # DB/Redis tests (run sequentially)
+```
+
+## Naming & Organization
+
+- Test files: `{module}.test.ts` or `{module}.spec.ts`
+- Describe blocks mirror the module structure
+- Test names: `it('should {expected behavior} when {condition}')`
+
+## Unit Tests
+
+- Mock all external dependencies (DB, Redis, APIs)
+- Test domain logic in isolation
+- One assertion per test when practical
+
+## Integration Tests
+
+- Run sequentially (`--runInBand`) to avoid DB conflicts
+- Use test database (`DATABASE_TEST_URL`)
+- Clean up test data after each test
+
+## Running Tests
+
+```bash
+pnpm test           # All tests
+pnpm test:unit      # Unit tests only
+pnpm test:integration  # Integration tests (sequential)
+```

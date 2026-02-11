@@ -1,0 +1,101 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8.15.0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Generate Prisma Client
+        run: pnpm --filter backend db:generate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+      
+      - name: Run database migrations
+        run: pnpm --filter backend db:push
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+      
+      - name: Run linter
+        run: pnpm --filter backend lint
+      
+      - name: Run type check
+        run: pnpm --filter backend type-check
+      
+      - name: Run unit tests
+        run: pnpm --filter backend test:unit
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_DB: 1
+          JWT_SECRET: test-secret-key-for-ci
+      
+      - name: Run integration tests
+        run: pnpm --filter backend test:integration
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_DB: 1
+          JWT_SECRET: test-secret-key-for-ci
+      
+      - name: Build
+        run: pnpm --filter backend build:skip-tests
+      
+      - name: Upload test coverage
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./packages/backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+

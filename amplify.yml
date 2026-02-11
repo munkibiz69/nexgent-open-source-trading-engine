@@ -1,0 +1,33 @@
+version: 1
+applications:
+  - appRoot: packages/frontend
+    frontend:
+      # Run all commands from monorepo root (where .npmrc and node_modules are)
+      buildPath: /
+      phases:
+        preBuild:
+          commands:
+            # Install pnpm (required for pnpm monorepos)
+            - corepack enable
+            - corepack prepare pnpm@8.15.0 --activate
+            # Install all dependencies from root
+            # .npmrc with node-linker=hoisted creates traditional node_modules
+            - pnpm install --frozen-lockfile
+            # Create .env.production file with environment variables for Next.js SSR
+            # These are set in Amplify Console → Environment variables
+            - echo "NEXTAUTH_SECRET=$NEXTAUTH_SECRET" > packages/frontend/.env.production
+            - echo "NEXTAUTH_URL=$NEXTAUTH_URL" >> packages/frontend/.env.production
+            - echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> packages/frontend/.env.production
+            - echo "Environment variables configured" && cat packages/frontend/.env.production
+        build:
+          commands:
+            # Build only the frontend
+            - pnpm --filter @nexgent/frontend build
+      artifacts:
+        # baseDirectory is relative to buildPath (root), not appRoot
+        baseDirectory: packages/frontend/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*

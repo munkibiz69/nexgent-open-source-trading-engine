@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+  // Generate into repo root node_modules so pnpm resolves @prisma/client to the generated client (CI and local)
+  output   = "../../../../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// User accounts for authentication and authorization
+/// Migrated from Supabase auth.users table
+model User {
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String?   @map("password_hash") @db.VarChar(255)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
+  agents              Agent[]
+  apiKeys             ApiKey[]
+  tradingSignals      TradingSignal[]
+
+  @@map("users")
+}
+
+/// API keys for programmatic access
+/// Keys are hashed and stored securely - the raw key is only shown once at creation
+model ApiKey {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  keyHash   String   @unique @map("key_hash")
+  keyPrefix String   @map("key_prefix") @db.VarChar(12)
+  scopes    String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+/// AI agents created by users
+/// Lightweight agent model
+model Agent {
+  id                           String                 @id @default(uuid()) @db.Uuid
+  userId                       String                 @map("user_id") @db.Uuid
+  name                         String                 @db.VarChar(255)
+  tradingMode                  String                 @default("simulation") @map("trading_mode") @db.VarChar(20)
+  automatedTradingSimulation   Boolean                @default(true) @map("automated_trading_simulation")
+  automatedTradingLive         Boolean                @default(true) @map("automated_trading_live")
+  tradingConfig                Json?                  @map("trading_config")
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  balanceSnapshots AgentBalanceSnapshot[]
+  balances         AgentBalance[]
+  historicalSwaps  AgentHistoricalSwap[]
+  positions        AgentPosition[]
+  transactions     AgentTransaction[]
+  wallets          AgentWallet[]
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signalExecutions SignalExecution[]
+
+  @@index([userId])
+  @@map("agents")
+}
+
+/// Agent token balances
+/// Tracks cryptocurrency token balances for each agent
+///
+/// Balance is stored as a string to support arbitrary precision for all token types.
+/// For Solana, this allows storing balances in lamports (integers) or SOL (decimals).
+/// Parse and convert balances in the application layer as needed.
+model AgentBalance {
+  id            String      @id @default(uuid()) @db.Uuid
+  agentId       String      @map("agent_id") @db.Uuid
+  walletAddress String      @map("wallet_address") @db.VarChar(44)
+  tokenAddress  String      @map("token_address") @db.VarChar(255)
+  tokenSymbol   String      @map("token_symbol") @db.VarChar(20)
+  balance       String
+  lastUpdated   DateTime    @updatedAt @map("last_updated") @db.Timestamptz(6)
+  agent         Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  wallet        AgentWallet @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@unique([walletAddress, tokenAddress])
+  @@index([agentId])
+  @@index([walletAddress])
+  @@index([agentId, walletAddress])
+  @@index([tokenAddress])
+  @@map("agent_balances")
+}
+
+/// Agent balance snapshots
+/// Stores hourly snapshots of agent portfolio balances for historical charting
+/// Snapshots are captured hourly per wallet and can be queried at hourly (24h view) or daily (all time view) granularity
+model AgentBalanceSnapshot {
+  id                  String      @id @default(uuid()) @db.Uuid
+  agentId             String      @map("agent_id") @db.Uuid
+  walletAddress       String      @map("wallet_address") @db.VarChar(44)
+  snapshotTimestamp   DateTime    @map("snapshot_timestamp") @db.Timestamptz(6)
+  portfolioBalanceSol Decimal     @map("portfolio_balance_sol") @db.Decimal(20, 8)
+  solBalance          Decimal     @map("sol_balance") @db.Decimal(20, 8)
+  positionsValueSol   Decimal     @map("positions_value_sol") @db.Decimal(20, 8)
+  unrealizedPnLSol    Decimal     @map("unrealized_pnl_sol") @db.Decimal(20, 8)
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  agent               Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  wallet              AgentWallet @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@unique([agentId, walletAddress, snapshotTimestamp])
+  @@index([agentId, walletAddress, snapshotTimestamp])
+  @@index([walletAddress])
+  @@index([snapshotTimestamp])
+  @@map("agent_balance_snapshots")
+}
+
+/// Trading signals that trigger agent transactions
+/// Signals are generated by the signal generation engine and can trigger multiple transactions
+model TradingSignal {
+  id               Int                   @id @default(autoincrement())
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tokenAddress     String                @map("token_address") @db.VarChar(255)
+  symbol           String?               @map("symbol") @db.VarChar(50)
+  signalType       String                @map("signal_type") @db.VarChar(50)
+  activationReason String?               @map("activation_reason")
+  signalStrength   Int                   @map("signal_strength")
+  source           String?               @map("source") @db.VarChar(100)
+  userId           String?               @map("user_id") @db.Uuid
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  historicalSwaps  AgentHistoricalSwap[]
+  transactions     AgentTransaction[]
+  signalExecutions SignalExecution[]
+
+  @@index([tokenAddress])
+  @@index([signalType])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("trading_signals")
+}
+
+/// Signal execution tracking
+/// Tracks the status of signal processing for each eligible agent
+model SignalExecution {
+  id            String            @id @default(uuid()) @db.Uuid
+  signalId      Int               @map("signal_id")
+  agentId       String            @map("agent_id") @db.Uuid
+  status        String            @db.VarChar(20)
+  transactionId String?           @map("transaction_id") @db.Uuid
+  error         String?
+  executedAt    DateTime          @default(now()) @map("executed_at") @db.Timestamptz(6)
+  agent         Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  signal        TradingSignal     @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  transaction   AgentTransaction? @relation(fields: [transactionId], references: [id])
+
+  @@unique([signalId, agentId])
+  @@index([signalId])
+  @@index([agentId])
+  @@map("signal_executions")
+}
+
+/// Agent transactions
+/// Stores transaction records for agents, including deposits, withdrawals, swaps, and burns
+model AgentTransaction {
+  id                  String                @id @default(uuid()) @db.Uuid
+  agentId             String                @map("agent_id") @db.Uuid
+  walletAddress       String?               @map("wallet_address") @db.VarChar(44)
+  transactionType     TransactionType       @map("transaction_type")
+  transactionValueUsd Decimal               @map("transaction_value_usd") @db.Decimal(20, 8)
+  transactionTime     DateTime              @map("transaction_time") @db.Timestamptz(6)
+  destinationAddress  String?               @map("destination_address") @db.VarChar(255)
+  signalId            Int?                  @map("signal_id")
+  fees                Decimal?              @db.Decimal(20, 8)
+  routes              Json?
+  inputMint           String?               @map("input_mint") @db.VarChar(255)
+  inputSymbol         String?               @map("input_symbol") @db.VarChar(20)
+  inputAmount         Decimal?              @map("input_amount") @db.Decimal(30, 18)
+  inputPrice          Decimal?              @map("input_price") @db.Decimal(30, 18)
+  outputMint          String?               @map("output_mint") @db.VarChar(255)
+  outputSymbol        String?               @map("output_symbol") @db.VarChar(20)
+  outputAmount        Decimal?              @map("output_amount") @db.Decimal(30, 18)
+  outputPrice         Decimal?              @map("output_price") @db.Decimal(30, 18)
+  slippage            Decimal?              @db.Decimal(10, 4)
+  priceImpact         Decimal?              @map("price_impact") @db.Decimal(10, 4)
+  isDca               Boolean               @default(false) @map("is_dca")
+  isTakeProfit        Boolean               @default(false) @map("is_take_profit")
+  transactionHash     String?               @map("transaction_hash") @db.VarChar(255)
+  protocolFeeSol      Decimal?              @map("protocol_fee_sol") @db.Decimal(20, 8)
+  networkFeeSol       Decimal?              @map("network_fee_sol") @db.Decimal(20, 8)
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  swapPayload         Json?                 @map("swap_payload")
+  purchaseSwaps       AgentHistoricalSwap[] @relation("PurchaseTransaction")
+  saleSwaps           AgentHistoricalSwap[] @relation("SaleTransaction")
+  position            AgentPosition?
+  agent               Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  signal              TradingSignal?        @relation(fields: [signalId], references: [id])
+  wallet              AgentWallet?          @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+  signalExecution     SignalExecution[]
+
+  @@index([agentId])
+  @@index([walletAddress])
+  @@index([agentId, walletAddress])
+  @@index([transactionType])
+  @@index([transactionTime])
+  @@index([signalId])
+  @@index([agentId, transactionTime])
+  @@index([agentId, transactionType])
+  @@map("agent_transactions")
+}
+
+/// Agent historical swaps
+/// Stores historical swap transaction data for agents, tracking completed swaps with purchase and sale prices, profit/loss calculations, and performance metrics
+model AgentHistoricalSwap {
+  id                    String            @id @default(uuid()) @db.Uuid
+  agentId               String            @map("agent_id") @db.Uuid
+  walletAddress         String?           @map("wallet_address") @db.VarChar(44)
+  tokenAddress          String            @map("token_address") @db.VarChar(255)
+  tokenSymbol           String            @map("token_symbol") @db.VarChar(20)
+  amount                Decimal           @db.Decimal(30, 18)
+  purchasePrice         Decimal           @map("purchase_price") @db.Decimal(30, 18)
+  salePrice             Decimal           @map("sale_price") @db.Decimal(30, 18)
+  changePercent         Decimal           @map("change_percent") @db.Decimal(10, 4)
+  profitLossUsd         Decimal           @map("profit_loss_usd") @db.Decimal(20, 8)
+  profitLossSol         Decimal           @map("profit_loss_sol") @db.Decimal(20, 8)
+  purchaseTime          DateTime          @map("purchase_time") @db.Timestamptz(6)
+  saleTime              DateTime          @map("sale_time") @db.Timestamptz(6)
+  purchaseTransactionId String?           @map("purchase_transaction_id") @db.Uuid
+  saleTransactionId     String?           @map("sale_transaction_id") @db.Uuid
+  signalId              Int?              @map("signal_id")
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  closeReason           String?           @map("close_reason") @db.VarChar(20)
+  agent                 Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  purchaseTransaction   AgentTransaction? @relation("PurchaseTransaction", fields: [purchaseTransactionId], references: [id])
+  saleTransaction       AgentTransaction? @relation("SaleTransaction", fields: [saleTransactionId], references: [id])
+  signal                TradingSignal?    @relation(fields: [signalId], references: [id])
+  wallet                AgentWallet?      @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([walletAddress])
+  @@index([agentId, walletAddress])
+  @@index([tokenAddress])
+  @@index([signalId])
+  @@index([purchaseTransactionId])
+  @@index([saleTransactionId])
+  @@index([purchaseTime])
+  @@index([saleTime])
+  @@index([agentId, tokenAddress])
+  @@index([agentId, purchaseTime])
+  @@index([agentId, saleTime])
+  @@index([agentId, createdAt])
+  @@index([agentId, signalId])
+  @@map("agent_historical_swaps")
+}
+
+/// Agent wallets for non-custodial wallet management
+/// Wallets are loaded from environment variables (WALLET_1, WALLET_2, etc.)
+/// Private keys are never stored in the database
+/// Supports both simulation (testnet) and live (mainnet) trading
+/// Network can be derived from walletType: simulation = testnet, live = mainnet
+model AgentWallet {
+  walletAddress   String                @id @map("wallet_address") @db.VarChar(44)
+  agentId         String                @map("agent_id") @db.Uuid
+  walletType      String                @map("wallet_type") @db.VarChar(20)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  balances        AgentBalance[]
+  historicalSwaps AgentHistoricalSwap[]
+  positions       AgentPosition[]
+  transactions    AgentTransaction[]
+  balanceSnapshots AgentBalanceSnapshot[]
+  agent           Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, walletType])
+  @@index([agentId])
+  @@map("agent_wallets")
+}
+
+/// Agent positions
+/// Tracks open positions with dynamic stop loss state, DCA history, and take-profit state
+/// Stores only dynamic state (stop loss level, peak price, DCA info, take-profit progress) with references to transactions and balances
+model AgentPosition {
+  id                        String           @id @default(uuid()) @db.Uuid
+  agentId                   String           @map("agent_id") @db.Uuid
+  walletAddress             String           @map("wallet_address") @db.VarChar(44)
+  tokenAddress              String           @map("token_address") @db.VarChar(255)
+  tokenSymbol               String           @map("token_symbol") @db.VarChar(20)
+  purchaseTransactionId     String           @unique @map("purchase_transaction_id") @db.Uuid
+  purchasePrice             Decimal          @map("purchase_price") @db.Decimal(30, 18)
+  purchaseAmount            Decimal          @map("purchase_amount") @db.Decimal(30, 18)
+  currentStopLossPercentage Decimal?         @map("current_stop_loss_percentage") @db.Decimal(5, 2)
+  peakPrice                 Decimal?         @map("peak_price") @db.Decimal(30, 18)
+  lastStopLossUpdate        DateTime?        @map("last_stop_loss_update") @db.Timestamptz(6)
+  createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // DCA tracking fields
+  dcaCount                  Int              @default(0) @map("dca_count")
+  dcaTransactionIds         String[]         @default([]) @map("dca_transaction_ids")
+  lastDcaTime               DateTime?        @map("last_dca_time") @db.Timestamptz(6)
+  lowestPrice               Decimal?         @map("lowest_price") @db.Decimal(30, 18)
+  totalInvestedSol          Decimal          @default(0) @map("total_invested_sol") @db.Decimal(20, 8)
+  
+  // Take-profit tracking fields
+  /// Tokens remaining after partial take-profit sales (null = full purchaseAmount)
+  remainingAmount           Decimal?         @map("remaining_amount") @db.Decimal(30, 18)
+  /// Number of take-profit levels that have been executed
+  takeProfitLevelsHit       Int              @default(0) @map("take_profit_levels_hit")
+  /// Transaction IDs for take-profit partial sales
+  takeProfitTransactionIds  String[]         @default([]) @map("take_profit_transaction_ids")
+  /// Timestamp of last take-profit execution
+  lastTakeProfitTime        DateTime?        @map("last_take_profit_time") @db.Timestamptz(6)
+  /// Whether moon bag has been activated (set aside)
+  moonBagActivated          Boolean          @default(false) @map("moon_bag_activated")
+  /// Amount of tokens set aside as moon bag
+  moonBagAmount             Decimal?         @map("moon_bag_amount") @db.Decimal(30, 18)
+  /// Cumulative realized profit in SOL from take-profit sales
+  realizedProfitSol         Decimal          @default(0) @map("realized_profit_sol") @db.Decimal(20, 8)
+  /// TP level at which the current batch started (set on DCA for append-levels model)
+  tpBatchStartLevel         Int              @default(0) @map("tp_batch_start_level")
+  /// Total TP levels including appended batches from DCA (null = use config.levels.length)
+  totalTakeProfitLevels     Int?             @map("total_take_profit_levels")
+  
+  agent                     Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  purchaseTransaction       AgentTransaction @relation(fields: [purchaseTransactionId], references: [id], onDelete: Cascade)
+  wallet                    AgentWallet      @relation(fields: [walletAddress], references: [walletAddress], onDelete: Cascade)
+
+  @@unique([agentId, walletAddress, tokenAddress])
+  @@index([agentId, walletAddress])
+  @@index([tokenAddress])
+  @@index([agentId])
+  @@index([purchaseTransactionId])
+  @@map("agent_positions")
+}
+
+/// Transaction type enum for agent transactions
+enum TransactionType {
+  DEPOSIT
+  SWAP
+  BURN
+}

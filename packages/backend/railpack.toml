@@ -1,0 +1,5 @@
+[build]
+command = "pnpm install && pnpm --filter @nexgent/backend build"
+
+[deploy]
+start = "pnpm --filter @nexgent/backend db:migrate:deploy && pnpm --filter @nexgent/backend start"

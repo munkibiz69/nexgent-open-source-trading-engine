@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "agent_historical_swaps" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "purchase_price" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "sale_price" SET DATA TYPE DECIMAL(30,18);
+
+-- AlterTable
+ALTER TABLE "agent_positions" ALTER COLUMN "purchase_price" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "purchase_amount" SET DATA TYPE DECIMAL(30,18),
+ALTER COLUMN "peak_price" SET DATA TYPE DECIMAL(30,18);

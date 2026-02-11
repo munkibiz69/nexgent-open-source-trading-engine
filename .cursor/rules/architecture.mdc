@@ -1,0 +1,53 @@
+---
+description: Project architecture and monorepo structure for the NexGent trading engine
+alwaysApply: true
+---
+
+# Project Architecture
+
+NexGent is a Solana trading engine using a **pnpm monorepo** with three packages:
+
+- `packages/backend` — Express.js API server (DDD + layered architecture)
+- `packages/frontend` — Next.js 15 App Router dashboard
+- `packages/shared` — Shared Zod schemas, types, and constants
+
+## Monorepo Conventions
+
+- Use `pnpm` with workspace protocol (`workspace:*`) for internal deps
+- Shared types/schemas go in `@nexgent/shared`, never duplicated
+- Each package has its own `tsconfig.json` extending the root
+- Path aliases: backend uses `@/domain/*`, `@/infrastructure/*`, `@/api/*`, `@/shared/*`; frontend uses `@/*` for `src/`
+
+## Backend Layered Architecture
+
+```
+src/
+├── api/           # HTTP layer: routes, handlers, middleware (versioned: v1/)
+├── domain/        # Business logic: services, event emitters, interfaces
+├── infrastructure/# External concerns: DB, cache, queue, WebSocket, external APIs
+├── shared/        # Cross-cutting: errors, constants, utilities
+├── config/        # App configuration
+└── middleware/     # Express middleware
+```
+
+**Key principles:**
+- Domain layer has NO infrastructure imports (dependency inversion)
+- API handlers call domain services, never repositories directly
+- Infrastructure implements interfaces defined in domain
+- One handler per file in `handlers/` folders (create.ts, list.ts, etc.)
+
+## Frontend Feature Architecture
+
+```
+src/
+├── app/            # Next.js App Router pages & layouts
+├── features/       # Feature modules (agents, positions, trading-signals, etc.)
+│   └── {feature}/  # Each has: components/, hooks/, contexts/, types/
+├── infrastructure/ # API client, auth, WebSocket
+└── shared/         # Reusable UI, providers, hooks, utils
+```
+
+**Key principles:**
+- Feature-based organization, not file-type-based
+- Infrastructure abstractions (API client, WebSocket) in `infrastructure/`
+- Reusable components in `shared/components/ui/` (shadcn/ui)

@@ -1,0 +1,54 @@
+---
+description: Prisma database patterns, migrations, and repository conventions
+globs: packages/backend/src/infrastructure/database/**/*.{ts,prisma,sql}
+alwaysApply: false
+---
+
+# Database & Prisma Conventions
+
+## Schema Location
+
+Schema file: `packages/backend/src/infrastructure/database/schema.prisma`
+
+## Repository Pattern
+
+Data access is abstracted through repository classes in `infrastructure/database/repositories/`:
+
+```typescript
+class AgentRepository implements IAgentRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findById(id: string): Promise<Agent | null> {
+    return this.prisma.agent.findUnique({ where: { id } });
+  }
+}
+```
+
+- Repositories implement interfaces from the domain layer
+- Use `Prisma.TransactionClient` for multi-step DB operations
+- Never call Prisma directly from handlers or services — always go through repositories
+
+## Migration Conventions
+
+- Folder format: `YYYYMMDDHHMMSS_description_name/migration.sql`
+- Use `pnpm db:migrate` for development
+- Use `pnpm db:migrate:deploy` for production
+- Never use `db:push` in production
+
+## Schema Best Practices
+
+- UUID primary keys (`@default(uuid())`)
+- Add indexes on foreign keys and commonly queried fields
+- Use composite indexes for multi-column queries (`@@index([agentId, walletAddress])`)
+- Store monetary values as `String` (arbitrary precision) or `Float` with clear naming
+- Use `@updatedAt` on all models that track modifications
+- JSON fields for flexible config (`Json` type for trading config)
+
+## Cache Sync
+
+After any DB write, sync the cache (write-through pattern):
+
+```typescript
+const agent = await this.agentRepo.create(data);
+await this.redisAgentService.setAgent(agent); // Always sync
+```

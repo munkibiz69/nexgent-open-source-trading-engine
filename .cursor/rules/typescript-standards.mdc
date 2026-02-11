@@ -1,0 +1,50 @@
+---
+description: TypeScript coding standards and conventions
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript Standards
+
+## General Rules
+
+- **Strict mode** is enabled — never use `any` without justification
+- Use `interface` for object shapes, `type` for unions/intersections
+- Prefer `const` over `let`, never use `var`
+- Use ES module imports (`import`/`export`), no CommonJS
+- File naming: **kebab-case** (`trading-executor.service.ts`)
+- Class naming: **PascalCase** (`TradingExecutorService`)
+- Function/variable naming: **camelCase** (`createTradingSignal`)
+
+## Error Handling
+
+```typescript
+// BAD — swallowing errors
+try { await fetchData(); } catch (e) {}
+
+// GOOD — typed errors with context
+try {
+  await fetchData();
+} catch (error) {
+  logger.error({ error, context }, 'Failed to fetch data');
+  throw new ExternalServiceError('Data fetch failed', { cause: error });
+}
+```
+
+## Async/Await
+
+- Always use `async/await` over raw Promises
+- Wrap async Express handlers with `asyncHandler` to propagate errors
+- Use `Promise.allSettled` for parallel operations that shouldn't fail together
+
+## Imports
+
+- Use path aliases (`@/domain/`, `@/infrastructure/`, `@nexgent/shared`)
+- Group imports: external libs, then internal modules, then relative imports
+- Use barrel exports (`index.ts`) for clean public APIs
+
+## Validation
+
+- Use **Zod** for all runtime validation (API input, config, env vars)
+- Define schemas in `@nexgent/shared` for cross-package reuse
+- Infer TypeScript types from Zod schemas: `type MyType = z.infer<typeof MySchema>`

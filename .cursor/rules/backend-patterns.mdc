@@ -1,0 +1,66 @@
+---
+description: Backend service patterns, error handling, and domain conventions
+globs: packages/backend/**/*.ts
+alwaysApply: false
+---
+
+# Backend Patterns
+
+## Service Pattern
+
+Services orchestrate business logic with constructor-injected dependencies:
+
+```typescript
+class AgentService {
+  constructor(private readonly agentRepo: IAgentRepository) {}
+
+  async createAgent(data: CreateAgentData): Promise<Agent> {
+    const agent = await this.agentRepo.create(data); // DB first
+    await this.syncAgentCache(agent);                  // Cache sync
+    return agent;
+  }
+}
+```
+
+- Use **write-through caching**: DB is source of truth, then sync cache
+- Use **singleton pattern** for shared services (`getInstance()`)
+- Emit domain events for cross-cutting concerns (`signalEventEmitter`)
+
+## Error Handling
+
+Use the custom error hierarchy in `src/shared/errors/`:
+
+```typescript
+// Throw typed errors — middleware converts to HTTP responses
+throw new ValidationError('Invalid input', { field: 'amount' });
+throw new NotFoundError('Agent not found');
+throw new TradingError('Insufficient balance');
+```
+
+Error classes: `ValidationError` (400), `AuthenticationError` (401), `AuthorizationError` (403), `NotFoundError` (404), `ConflictError` (409), `TradingError` (400), `ExternalServiceError` (502).
+
+**Never** catch and swallow errors silently. Always log and re-throw or throw a typed error.
+
+## Handler Pattern
+
+Each handler is a standalone async function using `AuthenticatedRequest`:
+
+```typescript
+export async function createTradingSignal(req: AuthenticatedRequest, res: Response) {
+  // 1. Extract & validate input
+  // 2. Call domain service
+  // 3. Return response
+  res.status(201).json(result);
+}
+```
+
+Wrap handlers with `asyncHandler` to forward errors to the error middleware.
+
+## Logging
+
+Use Pino structured logging. Include context (agentId, signalId, etc.):
+
+```typescript
+logger.info({ agentId, signalType }, 'Processing signal');
+logger.error({ error, tradeId }, 'Trade execution failed');
+```

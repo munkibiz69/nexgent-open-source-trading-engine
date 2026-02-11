@@ -1,0 +1,67 @@
+---
+description: Redis caching patterns, key management, and cache strategy
+globs: packages/backend/src/infrastructure/cache/**/*.ts
+alwaysApply: false
+---
+
+# Redis & Caching Patterns
+
+## Key Management
+
+All Redis keys are centralized in `src/shared/constants/redis-keys.ts`:
+
+```typescript
+export const REDIS_KEYS = {
+  POSITION: (id: string) => `position:${id}`,
+  BALANCE: (agentId: string, wallet: string, token: string) =>
+    `balance:${agentId}:${wallet}:${token}`,
+};
+```
+
+**Never** use hardcoded Redis key strings. Always use `REDIS_KEYS` helpers.
+
+## TTL Constants
+
+TTLs are in `REDIS_TTL`:
+- Locks: 10s
+- Idempotency keys: 300s (5 min)
+- Signal dedup: 60s
+
+## Write-Through Cache Pattern
+
+DB is always the source of truth. Cache is updated after successful DB writes:
+
+```typescript
+// 1. Write to DB first
+const result = await repository.create(data);
+
+// 2. Sync cache
+await redisService.set(result);
+
+// 3. Return result
+return result;
+```
+
+**Never** write to cache without writing to DB first.
+
+## Cache Services
+
+Dedicated services per domain concern:
+- `redisConfigService` — Agent trading configs
+- `redisPositionService` — Open positions
+- `redisBalanceService` — Token balances
+- `redisPriceService` — Token prices
+- `redisAgentService` — Active agents tracking
+
+## Distributed Locks
+
+Use Redis locks for critical sections (trade execution, position updates):
+
+```typescript
+const lock = await acquireLock(REDIS_KEYS.LOCK(resourceId), REDIS_TTL.LOCK);
+try {
+  // Critical section
+} finally {
+  await releaseLock(lock);
+}
+```

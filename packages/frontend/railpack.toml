@@ -1,0 +1,5 @@
+[build]
+command = "pnpm install && pnpm --filter @nexgent/frontend build"
+
+[deploy]
+start = "pnpm --filter @nexgent/frontend start"

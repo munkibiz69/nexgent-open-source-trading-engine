@@ -1,0 +1,664 @@
+{
+	"info": {
+		"_postman_id": "nexgent-api-keys-collection",
+		"name": "Nexgent API Keys",
+		"description": "API collection for external integrations using API keys.\n\n## Overview\n\nThis collection is designed for programmatic access to Nexgent using API keys. It includes all endpoints accessible via API key authentication.\n\n## Setup Instructions\n\n1. Import this collection into Postman\n2. Import the environment file (`Nexgent-API.postman_environment.json`)\n3. Set the `base_url` variable to your backend URL\n4. Set the `api_key` variable to your API key (starts with `nex_`)\n\n## Authentication\n\nAll requests use the `X-API-Key` header with your API key:\n\n```\nX-API-Key: nex_your_api_key_here\n```\n\n## Available Scopes\n\n| Scope | Access | Description |\n|-------|--------|-------------|\n| `signals` | Read + Write | Create and manage trading signals |\n| `agents` | Read | View agent data and configuration |\n| `positions` | Read | View open positions |\n| `balances` | Read | View agent balances |\n| `transactions` | Read | View transaction history |\n| `history` | Read | View historical swaps |\n| `full_access` | All | Access to all endpoints |\n\n## Rate Limits\n\n- Trading signals: 120 requests per minute\n- Other endpoints: Standard rate limits apply\n\n## Creating an API Key\n\nAPI keys are created via the web dashboard or the main API collection using JWT authentication. Keys are shown only once at creation - store them securely.\n\n## Folder Structure\n\nEach folder corresponds to a scope. Requests in a folder require that scope (or `full_access`).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Signals",
+			"item": [
+				{
+					"name": "Create Trading Signal",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('signal_id', response.id);",
+									"    ",
+									"    pm.test('Status code is 201', function () {",
+									"        pm.response.to.have.status(201);",
+									"    });",
+									"    ",
+									"    pm.test('Response has signal ID', function () {",
+									"        pm.expect(response).to.have.property('id');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tokenAddress\": \"So11111111111111111111111111111111111111112\",\n    \"symbol\": \"SOL\",\n    \"signalType\": \"buy\",\n    \"signalStrength\": 4,\n    \"activationReason\": \"Strong momentum detected\",\n    \"source\": \"external-signal-engine\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/trading-signals",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"trading-signals"
+							]
+						},
+						"description": "Create a new trading signal.\n\nSignals are **generic** - they don't target a specific agent. All eligible agents subscribed to the token will process the signal based on their configuration.\n\n**Required scope:** `signals` or `full_access`\n\n## Request Body\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| tokenAddress | string | Yes | Solana token mint address |\n| symbol | string | No | Token symbol (e.g., \"SOL\") |\n| signalType | string | Yes | Signal type (e.g., \"buy\", \"sell\") |\n| signalStrength | integer | Yes | Signal strength 1-5 (5 = strongest) |\n| activationReason | string | No | Why the signal was triggered |\n| source | string | No | Signal source identifier |\n\n## Response\n\n```json\n{\n    \"id\": \"uuid\",\n    \"tokenAddress\": \"So111...\",\n    \"symbol\": \"SOL\",\n    \"signalType\": \"buy\",\n    \"signalStrength\": 4,\n    \"activationReason\": \"Strong momentum detected\",\n    \"source\": \"external-signal-engine\",\n    \"createdAt\": \"2026-01-23T...\",\n    \"updatedAt\": \"2026-01-23T...\"\n}\n```\n\n## Signal Flow\n\n1. Signal is created via this endpoint\n2. System finds all eligible agents for the token\n3. Each agent processes the signal based on its config\n4. Trades are executed for agents that pass eligibility checks"
+					}
+				},
+				{
+					"name": "List Trading Signals",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trading-signals?limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"trading-signals"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of results (default: 100, max: 1000)"
+								},
+								{
+									"key": "offset",
+									"value": "0",
+									"description": "Pagination offset",
+									"disabled": true
+								},
+								{
+									"key": "tokenAddress",
+									"value": "",
+									"description": "Filter by token address",
+									"disabled": true
+								},
+								{
+									"key": "signalType",
+									"value": "buy",
+									"description": "Filter by signal type (buy, sell)",
+									"disabled": true
+								},
+								{
+									"key": "startDate",
+									"value": "",
+									"description": "Filter by start date (ISO string)",
+									"disabled": true
+								},
+								{
+									"key": "endDate",
+									"value": "",
+									"description": "Filter by end date (ISO string)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List trading signals.\n\n**Required scope:** `signals` or `full_access`\n\n## Query Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| tokenAddress | string | Filter by token address |\n| signalType | string | Filter by signal type (buy, sell) |\n| startDate | string | Filter by start date (ISO string) |\n| endDate | string | Filter by end date (ISO string) |\n| limit | number | Number of results (default: 100, max: 1000) |\n| offset | number | Pagination offset |"
+					}
+				},
+				{
+					"name": "Get Trading Signal",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trading-signals/{{signal_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"trading-signals",
+								"{{signal_id}}"
+							]
+						},
+						"description": "Get a specific trading signal by ID.\n\n**Required scope:** `signals` or `full_access`"
+					}
+				},
+				{
+					"name": "Delete Trading Signal",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/trading-signals/{{signal_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"trading-signals",
+								"{{signal_id}}"
+							]
+						},
+						"description": "Delete a trading signal.\n\n**Required scope:** `signals` or `full_access`"
+					}
+				}
+			],
+			"description": "**Required scope:** `signals`\n\nTrading signals are the primary way external systems interact with Nexgent. Signals are **generic** - they broadcast to all agents, and each eligible agent processes them independently.\n\n## Signal Types\n\n- **buy**: Signal to buy a token\n- **sell**: Signal to sell a token\n\n## Signal Strength\n\nSignal strength ranges from 1-5, where 5 is the strongest signal. Agents can be configured to only act on signals above a certain strength threshold.\n\n## Signal Flow\n\n1. External system sends signal via API (no agent ID needed)\n2. System finds all eligible agents for the token\n3. Each agent validates signal (eligibility, cooldown, config, etc.)\n4. Trades are executed for agents that pass all checks"
+		},
+		{
+			"name": "Agents",
+			"item": [
+				{
+					"name": "List Agents",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.items && response.items.length > 0) {",
+									"        pm.environment.set('agent_id', response.items[0].id);",
+									"    }",
+									"    pm.test('Status code is 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agents",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agents"
+							]
+						},
+						"description": "List all agents for the authenticated user.\n\n**Required scope:** `agents` or `full_access`\n\n## Response\n\n```json\n{\n    \"items\": [\n        {\n            \"id\": \"uuid\",\n            \"name\": \"My Agent\",\n            \"description\": \"...\",\n            \"status\": \"active\",\n            \"createdAt\": \"...\"\n        }\n    ]\n}\n```"
+					}
+				},
+				{
+					"name": "Get Agent",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agents/{{agent_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agents",
+								"{{agent_id}}"
+							]
+						},
+						"description": "Get a specific agent by ID.\n\n**Required scope:** `agents` or `full_access`"
+					}
+				},
+				{
+					"name": "Get Agent Config",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agents/{{agent_id}}/config",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agents",
+								"{{agent_id}}",
+								"config"
+							]
+						},
+						"description": "Get agent trading configuration.\n\n**Required scope:** `agents` or `full_access`\n\n## Response\n\nReturns trading parameters like:\n- Max position size\n- Stop loss / take profit\n- Slippage tolerance\n- Cooldown periods"
+					}
+				},
+				{
+					"name": "Get Agent Performance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agents/{{agent_id}}/performance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agents",
+								"{{agent_id}}",
+								"performance"
+							]
+						},
+						"description": "Get agent performance metrics.\n\n**Required scope:** `agents` or `full_access`\n\n## Response\n\nReturns performance data including:\n- Total P&L\n- Win rate\n- Trade count\n- Average trade duration"
+					}
+				},
+				{
+					"name": "Get Agent Balance History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agents/{{agent_id}}/balance-history?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agents",
+								"{{agent_id}}",
+								"balance-history"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "Number of days of history"
+								}
+							]
+						},
+						"description": "Get agent balance history over time.\n\n**Required scope:** `agents` or `full_access`"
+					}
+				}
+			],
+			"description": "**Required scope:** `agents` (read-only)\n\nView agent information, configuration, and performance metrics.\n\n**Note:** Creating, updating, or deleting agents requires web dashboard access (JWT authentication)."
+		},
+		{
+			"name": "Positions",
+			"item": [
+				{
+					"name": "Get Agent Positions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.positions && response.positions.length > 0) {",
+									"        pm.environment.set('position_id', response.positions[0].id);",
+									"    }",
+									"    pm.test('Status code is 200', function () {",
+									"        pm.response.to.have.status(200);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-positions/{{agent_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-positions",
+								"{{agent_id}}"
+							]
+						},
+						"description": "Get all open positions for an agent.\n\n**Required scope:** `positions` or `full_access`\n\n## Response\n\n```json\n{\n    \"positions\": [\n        {\n            \"id\": \"uuid\",\n            \"tokenAddress\": \"...\",\n            \"tokenSymbol\": \"SOL\",\n            \"entryPrice\": \"150.00\",\n            \"currentPrice\": \"155.00\",\n            \"quantity\": \"10.5\",\n            \"unrealizedPnl\": \"52.50\",\n            \"openedAt\": \"...\"\n        }\n    ]\n}\n```\n\n**Note:** Closing positions requires web dashboard access."
+					}
+				}
+			],
+			"description": "**Required scope:** `positions` (read-only)\n\nView open trading positions for agents.\n\n**Note:** Closing positions requires web dashboard access (JWT authentication)."
+		},
+		{
+			"name": "Balances",
+			"item": [
+				{
+					"name": "List Agent Balances",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-balances?agentId={{agent_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-balances"
+							],
+							"query": [
+								{
+									"key": "agentId",
+									"value": "{{agent_id}}",
+									"description": "Filter by agent ID"
+								}
+							]
+						},
+						"description": "List agent balance snapshots.\n\n**Required scope:** `balances` or `full_access`\n\n## Query Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| agentId | string | Filter by agent ID |"
+					}
+				},
+				{
+					"name": "Get Agent Balance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-balances/{{balance_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-balances",
+								"{{balance_id}}"
+							]
+						},
+						"description": "Get a specific balance snapshot.\n\n**Required scope:** `balances` or `full_access`"
+					}
+				}
+			],
+			"description": "**Required scope:** `balances` (read-only)\n\nView agent balance snapshots over time."
+		},
+		{
+			"name": "Transactions",
+			"item": [
+				{
+					"name": "List Agent Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-transactions?agentId={{agent_id}}&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-transactions"
+							],
+							"query": [
+								{
+									"key": "agentId",
+									"value": "{{agent_id}}",
+									"description": "Filter by agent ID"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of results"
+								}
+							]
+						},
+						"description": "List agent transactions.\n\n**Required scope:** `transactions` or `full_access`\n\n## Query Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| agentId | string | Filter by agent ID |\n| type | string | Filter by type (deposit, withdrawal, trade) |\n| limit | number | Number of results |\n| offset | number | Pagination offset |"
+					}
+				},
+				{
+					"name": "Get Agent Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-transactions/{{transaction_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-transactions",
+								"{{transaction_id}}"
+							]
+						},
+						"description": "Get a specific transaction.\n\n**Required scope:** `transactions` or `full_access`"
+					}
+				}
+			],
+			"description": "**Required scope:** `transactions` (read-only)\n\nView agent transaction history including deposits, withdrawals, and trades."
+		},
+		{
+			"name": "History",
+			"item": [
+				{
+					"name": "List Historical Swaps",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-historical-swaps?agentId={{agent_id}}&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-historical-swaps"
+							],
+							"query": [
+								{
+									"key": "agentId",
+									"value": "{{agent_id}}",
+									"description": "Filter by agent ID"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of results"
+								}
+							]
+						},
+						"description": "List historical swaps/trades.\n\n**Required scope:** `history` or `full_access`\n\n## Query Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| agentId | string | Filter by agent ID |\n| tokenAddress | string | Filter by token |\n| limit | number | Number of results |\n| offset | number | Pagination offset |"
+					}
+				},
+				{
+					"name": "Get Historical Swap",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-historical-swaps/{{swap_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-historical-swaps",
+								"{{swap_id}}"
+							]
+						},
+						"description": "Get a specific historical swap.\n\n**Required scope:** `history` or `full_access`"
+					}
+				},
+				{
+					"name": "Export Historical Swaps",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/agent-historical-swaps/export?agentId={{agent_id}}&format=csv",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"agent-historical-swaps",
+								"export"
+							],
+							"query": [
+								{
+									"key": "agentId",
+									"value": "{{agent_id}}",
+									"description": "Filter by agent ID"
+								},
+								{
+									"key": "format",
+									"value": "csv",
+									"description": "Export format (csv or json)"
+								}
+							]
+						},
+						"description": "Export historical swaps for analysis.\n\n**Required scope:** `history` or `full_access`\n\n## Query Parameters\n\n| Parameter | Type | Description |\n|-----------|------|-------------|\n| agentId | string | Filter by agent ID |\n| format | string | `csv` or `json` |"
+					}
+				}
+			],
+			"description": "**Required scope:** `history` (read-only)\n\nView and export historical swap/trade data for analysis and reporting."
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "key",
+				"value": "X-API-Key",
+				"type": "string"
+			},
+			{
+				"key": "value",
+				"value": "{{api_key}}",
+				"type": "string"
+			},
+			{
+				"key": "in",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Check if API key is set",
+					"if (!pm.environment.get('api_key')) {",
+					"    console.warn('API key not set. Please set the api_key environment variable.');",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:4000",
+			"type": "string"
+		}
+	]
+}

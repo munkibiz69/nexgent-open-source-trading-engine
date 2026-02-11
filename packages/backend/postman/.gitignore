@@ -1,0 +1,11 @@
+# Postman local files
+*.postman_environment.local.json
+*.postman_environment.*.local.json
+
+# Postman cache
+.postman/
+
+# Personal environment files
+*personal*.json
+*local*.json
+
