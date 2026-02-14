@@ -55,8 +55,8 @@ if (!agent || !agent.isActive || !agent.hasWallet) return;
 - Remove dead code, commented-out code, and TODO hacks before merging
 - Keep dependencies minimal — justify new packages
 
-## Commit & PR Quality
+## PR Quality
 
-- Write clear, descriptive commit messages explaining the "why"
 - Keep changes focused — one concern per PR
 - Ensure all tests pass before suggesting a change is complete
+- See `commit-release-messages` rule for commit and release conventions
