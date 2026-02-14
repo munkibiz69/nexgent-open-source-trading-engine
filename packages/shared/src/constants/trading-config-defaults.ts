@@ -12,7 +12,14 @@ import type { AgentTradingConfig, DCAConfig, SignalConfig, TakeProfitConfig } fr
  * Common signal types for dropdown selection
  * These are predefined options available in the UI
  */
-export const COMMON_SIGNAL_TYPES = ['buy', 'sell', 'Hypersurge', 'Pump', 'momentum'] as const;
+export const COMMON_SIGNAL_TYPES = [
+  'Velocity (Dormant Explosion)',
+  'Velocity (Hyper Surge Detection)',
+  'Velocity (Price Reversal Detection)',
+  'Velocity (Breakout Confirmation)',
+  'Ignition Beta (Microcap Revival)',
+  'Ignition Beta (ML Graduation)',
+] as const;
 
 /**
  * Default signal configuration
